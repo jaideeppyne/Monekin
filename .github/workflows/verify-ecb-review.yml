@@ -1,0 +1,43 @@
+name: Verify ECB review fixes
+on:
+  push:
+    branches: [verify/ecb-review-oct29]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: pubspec.yaml
+          channel: stable
+          cache: true
+      - name: Dependencies
+        run: |
+          flutter pub get
+          dart pub get --directory app-marketplaces/play-store
+      - name: Generate code
+        run: |
+          dart run slang
+          dart run build_runner build
+      - name: Format changed files
+        run: |
+          mkdir -p review-proof
+          dart format lib/app/currencies/currency_manager.dart lib/app/currencies/exchange_rate_form.dart lib/core/database/services/exchange-rate/exchange_rate_service.dart lib/core/services/exchange-rate/ecb_rate_sync.dart lib/core/services/exchange-rate/ecb_autofill.dart lib/core/services/exchange-rate/frankfurter_ecb.dart test/core/services/exchange-rate/ecb_autofill_test.dart test/core/services/exchange-rate/ecb_rate_sync_test.dart test/app/currencies/exchange_rate_form_ecb_test.dart
+          git diff --binary > review-proof/format.patch
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos 2>&1 | tee review-proof/analyze.log
+      - name: Tests and responsive form screenshots
+        env:
+          MONEKIN_REVIEW_IMAGES: review-proof/images
+        run: flutter test --reporter expanded 2>&1 | tee review-proof/tests.log
+      - name: Android debug build
+        run: flutter build apk --debug 2>&1 | tee review-proof/android-build.log
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecb-review-proof
+          path: review-proof
