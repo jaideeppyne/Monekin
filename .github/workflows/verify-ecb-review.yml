@@ -7,8 +7,15 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
           flutter-version-file: pubspec.yaml
@@ -16,6 +23,7 @@ jobs:
           cache: true
       - name: Dependencies
         run: |
+          flutter config --jdk-dir "$JAVA_HOME"
           flutter pub get
           dart pub get --directory app-marketplaces/play-store
       - name: Generate code
@@ -24,7 +32,7 @@ jobs:
         run: |
           mkdir -p review-proof
           dart format lib/app/currencies/currency_manager.dart lib/app/currencies/exchange_rate_form.dart lib/core/database/services/exchange-rate/exchange_rate_service.dart lib/core/services/exchange-rate/ecb_rate_sync.dart lib/core/services/exchange-rate/ecb_autofill.dart lib/core/services/exchange-rate/frankfurter_ecb.dart test/core/services/exchange-rate/ecb_autofill_test.dart test/core/services/exchange-rate/ecb_rate_sync_test.dart test/app/currencies/exchange_rate_form_ecb_test.dart
-          git diff --binary > review-proof/format.patch
+          git diff --binary -- lib/app/currencies lib/core/database/services/exchange-rate lib/core/services/exchange-rate test/core/services/exchange-rate test/app/currencies > review-proof/format.patch
       - name: Analyze
         run: flutter analyze --no-fatal-infos 2>&1 | tee review-proof/analyze.log
       - name: Tests and responsive form screenshots
